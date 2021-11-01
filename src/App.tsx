@@ -14,6 +14,8 @@ import './App.css'
 const App = () =>{
   // State / Props
   const [walletAddress, setWalletAddress] = useState('');
+  const [signedMessage, setSignedMessage] = useState('');
+  const [errorSigned, setErrorSigned] = useState('');
 
   // Functions
   /**
@@ -28,11 +30,32 @@ const App = () =>{
    */
   const onClickShowMeYourWallet = async () => {
     if (typeof window.ethereum !== undefined) {
-      await requestAccount();
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const address = await signer.getAddress();
-      setWalletAddress(address);
+      try {
+        await requestAccount();
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const address = await signer.getAddress();
+        setWalletAddress(address);
+      } catch (error) {
+        // Do nothing (make sure the user can still click the button)
+      }
+    }
+  }
+
+  /**
+   * 
+   */
+  const onClickSignMessage = async () => {
+    if (typeof window.ethereum !== undefined) {
+      setErrorSigned('');
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const signed = await signer.signMessage('Hello there!');
+        setSignedMessage(signed);
+      } catch (error: any) {
+        setErrorSigned(error?.message);
+      }
     }
   }
 
@@ -47,7 +70,15 @@ const App = () =>{
             Show me your wallet
           </button>
         </p>
-        {walletAddress ? <p>Your wallet address is: {walletAddress}</p> : null}
+        {walletAddress ? <div>
+          <p>Your wallet address is: {walletAddress}</p>
+          <hr />
+          <button type="button" onClick={onClickSignMessage}>
+            Sign message
+          </button>
+          {signedMessage ? <p>Your signed message: {signedMessage}</p> : null}
+          {errorSigned ? <code>Signature declined. {JSON.stringify(errorSigned)}</code> : null}
+          </div> : null}
         <p>
           Edit <code>App.tsx</code> and save to test HMR updates.
         </p>
