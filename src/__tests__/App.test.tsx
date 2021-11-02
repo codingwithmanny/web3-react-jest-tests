@@ -14,6 +14,8 @@ const WALLET_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const SIGNED_MESSAGE = '0xa2162955fbfbac44ad895441a3501465861435d6615053a64fc9622d98061f1556e47c6655d0ea02df00ed6f6050298eea381b4c46f8148ecb617b32695bdc451c';
 const ERROR_DECLINED_REQUEST = 'User rejected the request.';
 const ERROR_DECLINED_SIGNATURE = 'MetaMask Message Signature: User denied message signature.';
+const CONTRACT_GREETING = 'Hello there!1';
+const CONTRACT_GREETING_UPDATED = 'Goodbye!2';
 
 // Mocks
 // ========================================================
@@ -31,6 +33,35 @@ const WINDOW_ETHEREUM = {
     throw Error(`Unknown request: ${request.method}`);
   },
 }
+
+/**
+ * 
+ */
+jest.mock('ethers', () => {
+  const original = jest.requireActual('ethers');
+  return {
+    ...original,
+    ethers: {
+      ...original.ethers,
+      Contract: jest.fn().mockImplementation((...data: any) => {
+        let greeting = CONTRACT_GREETING;
+        return {
+          greet: () => greeting,
+          setGreeting: (value: string) => {
+            greeting = value;
+            return {
+              hash: '0x1something',
+              wait: () => {
+                return true;
+              }
+              // And a bunch of other stuff returned for the transaction
+            }
+          }
+        }
+      })
+    }
+  }
+})
 
 /**
  * 
@@ -143,7 +174,7 @@ test('Signs message with connected wallet', async () => {
   expect(ethers.utils.verifyMessage('Hello there!', signedMessage as string)).toBe(WALLET_ADDRESS);
 });
 
- /**
+/**
  * 
  */
 test('Does NOT sign message with connected wallet because canceled', async () => {
@@ -185,4 +216,81 @@ test('Does NOT sign message with connected wallet because canceled', async () =>
   expect(await screen.queryByText(regexWallet)).toBeInTheDocument();
   expect(await screen.queryByText(/Sign message/)).toBeInTheDocument();
   expect(await screen.queryByText(regexDeclinedSignature)).toBeInTheDocument();
+});
+
+/**
+ * 
+ */
+test('Retrieves contract greeting', async () => {
+  // Setup
+  render(<App />);
+  const buttonWallet = await screen.queryByText(/Show me your wallet/);
+  const buttonGetGreeting = await screen.queryByText(/Get Greeting/);
+
+  // Pre Expecations
+  expect(buttonWallet).toBeInTheDocument();
+  expect(buttonGetGreeting).not.toBeInTheDocument();
+
+  // Init
+  await act(async () => {
+    user.click(buttonWallet as HTMLElement);
+  });
+
+  await act(async () => {
+    user.click(await screen.queryByText(/Get Greeting/) as HTMLElement);
+  })
+
+  // Post Expectations
+  const regexWallet = new RegExp(`${WALLET_ADDRESS}`);
+  const regexContractGreeting = new RegExp(`Contract message: ${CONTRACT_GREETING}`);
+  expect(await screen.queryByText(regexWallet)).toBeInTheDocument();
+  expect(await screen.queryByText(/Get Greeting/)).toBeInTheDocument();
+  expect(await screen.queryByText(regexContractGreeting)).toBeInTheDocument();
+});
+
+/**
+ * 
+ */
+test('Does NOT retrieve contract greeting - server/connection error', async () => {
+  // TBD
+});
+
+/**
+ * 
+ */
+ test('Updates contract greeting', async () => {
+  // Setup
+  render(<App />);
+  const buttonWallet = await screen.queryByText(/Show me your wallet/);
+  const buttonUpdateGreeting = await screen.queryByText(/Update Greeting/);
+
+  // Pre Expecations
+  expect(buttonWallet).toBeInTheDocument();
+  expect(buttonUpdateGreeting).not.toBeInTheDocument();
+
+  // Init
+  await act(async () => {
+    user.click(buttonWallet as HTMLElement);
+  });
+
+  user.type(await screen.getByPlaceholderText(/Set a greeting/), CONTRACT_GREETING_UPDATED);
+
+  await act(async () => {
+    user.click(await screen.queryByText(/Update Greeting/) as HTMLElement);
+  })
+
+  // Post Expectations
+  const regexWallet = new RegExp(`${WALLET_ADDRESS}`);
+  const regexContractGreeting = new RegExp(`Contract message: ${CONTRACT_GREETING_UPDATED}`);
+  expect(await screen.queryByText(regexWallet)).toBeInTheDocument();
+  expect(await screen.queryByText(/Update Greeting/)).toBeInTheDocument();
+  expect(await screen.queryByText(regexContractGreeting)).toBeInTheDocument();
+  expect(await screen.getByPlaceholderText(/Set a greeting/)).toHaveValue(CONTRACT_GREETING_UPDATED)
+});
+
+/**
+ * 
+ */
+test('Does NOT update contract greeting', async () => {
+  // TBD
 });
